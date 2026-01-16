@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: hass-otbr-docker
+  IMAGE_NAME: ha-otbr
 
 jobs:
   build-amd64:
