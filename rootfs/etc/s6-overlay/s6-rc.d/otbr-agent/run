@@ -24,7 +24,12 @@ if config_exists 'autoflash_firmware'; then
     addon_option 'autoflash_firmware'
 fi
 
-backbone_if="$(api_supervisor 'GET' '/network/info')"
+# Prefer explicit BACKBONE_IF config (env BACKBONE_IF) when provided
+if config_has_value 'backbone_if'; then
+    backbone_if="$(config_get 'backbone_if')"
+else
+    backbone_if="$(api_supervisor 'GET' '/network/info')"
+fi
 device=$(config_get 'device')
 
 if config_has_value 'network_device'; then

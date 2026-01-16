@@ -17,9 +17,10 @@ addon_hostname() { hostname -f 2>/dev/null || hostname; }
 addon_ip_address() { echo "${ADDON_IP_ADDRESS:-127.0.0.1}"; }
 
 addon_port() {
-    # Call as: addon_port 8080 -> reads env ADDON_PORT_8080 or OTBR_PORT_8080
-    local port="$1" var="ADDON_PORT_${port}" var2="OTBR_PORT_${port}"
-    echo "${!var:-${!var2:-}}"
+    # Call as: addon_port 8080 -> reads env ADDON_PORT_8080, OTBR_PORT_8080, or OTBR_WEB_PORT
+    local port="$1" var="ADDON_PORT_${port}" var2="OTBR_PORT_${port}" var3
+    if [ "$port" = "8080" ]; then var3="OTBR_WEB_PORT"; elif [ "$port" = "8081" ]; then var3="OTBR_REST_PORT"; fi
+    echo "${!var:-${!var2:-${!var3:-}}}"
 }
 
 var_true() { [ "$1" = "true" ] || [ "$1" = "1" ]; }
