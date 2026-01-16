@@ -29,7 +29,11 @@ config_key_to_env() { echo "$1" | tr '[:lower:]' '[:upper:]' | tr '.-' '__'; }
 config_get() { local k; k=$(config_key_to_env "$1"); echo "${!k:-}"; }
 config_has_value() { [ -n "$(config_get "$1")" ]; }
 config_true() { [ "$(config_get "$1")" = "true" ] || [ "$(config_get "$1")" = "1" ]; }
-config_exists() { [ "${!$(config_key_to_env "$1")}" != "" ] && return 0 || return 1; }
+config_exists() {
+    local k
+    k=$(config_key_to_env "$1")
+    [ -n "${!k:-}" ] && return 0 || return 1
+}
 
 string_lower() { echo "$1" | tr '[:upper:]' '[:lower:]'; }
 
@@ -47,16 +51,19 @@ api_supervisor() {
 
 var_json() {
     # Build a simple json object from key value pairs: key val key val ...
-    printf '{'
+    printf '%s' '{'
     local first=1
     while [ $# -gt 0 ]; do
         local key="$1"; shift
         local val="$1"; shift
-        if [ $first -eq 0 ]; then printf ','; fi
+        if [ "$first" -eq 0 ]; then printf ','; fi
         first=0
-        printf '"%s":"%s"' "$key" "${val//"/\"}"
+        local escaped
+        escaped="${val//\\/\\\\}"
+        escaped="${escaped//\"/\\\"}"
+        printf '"%s":"%s"' "$key" "$escaped"
     done
-    printf '}'
+    printf '%s' '}'
 }
 
 discovery_send() { # no-op but report success
