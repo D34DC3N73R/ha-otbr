@@ -224,4 +224,4 @@ See [LICENSE](LICENSE) file.
 
 ## Credits
 
-Based on the [Home Assistant OTBR Add-on](https://github.com/home-assistant/addons), converted to a standalone container.
+Based on the [Home Assistant OTBR Add-on](https://github.com/home-assistant/addons/tree/master/openthread_border_router), converted to a standalone container.
