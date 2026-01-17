@@ -162,7 +162,7 @@ python3 /usr/local/bin/migrate_otbr_settings.py \
     --adapter "${device}" \
     --baudrate "${baudrate}" \
     --flow-control "${migrate_flow_control}" \
-    --data-dir /data/thread/
+    --data-dir /data/thread/ 2>/dev/null || log_warn "Settings migration failed or not needed"
 
 # shellcheck disable=SC2086
 log_info "Starting otbr-agent..."
