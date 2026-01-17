@@ -82,6 +82,8 @@ esac
 if [ -z "${backbone_if}" ]; then
     log_warn "No primary network interface found! Using static eth0."
     backbone_if="eth0"
+else
+    log_info "Using backbone interface: ${backbone_if}"
 fi
 
 # shellcheck disable=SC2015
