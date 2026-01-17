@@ -1,0 +1,82 @@
+services:
+  otbr:
+    container_name: otbr
+    image: ghcr.io/d34dc3n73r/ha-otbr:latest
+    restart: unless-stopped
+    
+    # Host networking is REQUIRED for proper IPv6 multicast, mDNS, and Thread TREL
+    network_mode: host
+    
+    # Required capabilities for network management and Thread interface creation
+    cap_add:
+      - SYS_ADMIN  # Required for network namespace operations
+      - NET_ADMIN  # Required for network interface management
+      - NET_RAW    # Required for raw socket operations
+    
+    environment:
+      # ===== REQUIRED: Thread Radio Configuration =====
+      
+      # USB serial device path (use EITHER this OR NETWORK_DEVICE, not both)
+      # Find yours with: ls -la /dev/ttyUSB* /dev/ttyACM*
+      DEVICE: "/dev/ttyUSB0"
+      
+      # Network-connected radio (TCP address) - alternative to USB serial
+      # Uncomment to use network radio instead of USB:
+      # NETWORK_DEVICE: "192.168.1.100:5000"
+      
+      # Primary network interface for Thread routing
+      # Find yours with: ip route show default | awk '{print $5}'
+      # Common values: eth0, enp5s0, ens18, wlan0
+      BACKBONE_IF: eth0
+      
+      # ===== OPTIONAL: Service Enablement =====
+      
+      # REST API (Home Assistant integration) - must be port 8081
+      # - Set to 8081: API binds to all interfaces (accessible from network)
+      # - Unset/comment: API binds to localhost only (secure default)
+      OTBR_REST_PORT: 8081
+      
+      # Web UI - can be any port
+      # - Set to enable web interface (typically 8080)
+      # - Unset/comment to disable web UI
+      OTBR_WEB_PORT: 8080
+      
+      # ===== OPTIONAL: Radio Settings =====
+      
+      # Serial baudrate (common: 115200, 230400, 460800)
+      BAUDRATE: 460800
+      
+      # Hardware flow control
+      # 1 = enabled (recommended for high baudrates)
+      # 0 = disabled
+      FLOW_CONTROL: 1
+      
+      # ===== OPTIONAL: Network & Security =====
+      
+      # Enable Thread ingress firewall (recommended)
+      # 1 = enabled, 0 = disabled
+      FIREWALL: 1
+      
+      # Enable NAT64 for Thread devices to access IPv4 internet
+      # 1 = enabled, 0 = disabled
+      NAT64: 1
+      
+      # ===== OPTIONAL: Logging =====
+      
+      # Log level: debug, info, notice, warning, error, critical, alert, emergency
+      OTBR_LOG_LEVEL: info
+    
+    devices:
+      # Expose Thread radio device (comment out if using NETWORK_DEVICE)
+      - /dev/ttyUSB0:/dev/ttyUSB0
+      
+      # Required for Thread network interface (wpan0)
+      - /dev/net/tun:/dev/net/tun
+    
+    volumes:
+      # Persist Thread network settings across container restarts
+      # This stores network credentials, child device info, etc.
+      - ./otbr-data:/data/thread
+      
+      # Sync container time with host
+      - /etc/localtime:/etc/localtime:ro
