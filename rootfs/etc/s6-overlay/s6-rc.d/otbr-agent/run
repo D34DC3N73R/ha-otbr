@@ -167,9 +167,11 @@ python3 /usr/local/bin/migrate_otbr_settings.py \
 # shellcheck disable=SC2086
 log_info "Starting otbr-agent..."
 # shellcheck disable=SC2086
+# Filter out harmless/expected warnings from otbr-agent startup
 exec s6-notifyoncheck -d -s 300 -w 300 -n 0 stdbuf -oL \
     "/usr/sbin/otbr-agent" -I ${thread_if} -B "${backbone_if}" \
         --rest-listen-address "${otbr_rest_listen}" \
         -d${otbr_log_level_int} -v -s \
         "spinel+hdlc+uart://${device}?uart-baudrate=${baudrate}${flow_control}" \
-        "trel://${backbone_if}"
+        "trel://${backbone_if}" 2>&1 | \
+    grep -vE '(P-Netif.*Failed to process request.*(No such process|Invalid argument)|DuaManager.*Failed to perform.*registration: NotFound)'
