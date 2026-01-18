@@ -60,7 +60,7 @@ services:
       - NET_ADMIN
       - NET_RAW
     environment:
-      NETWORK_DEVICE: "192.168.1.100:5000" # TCP address of Thread radio
+      NETWORK_DEVICE: "192.168.1.100:6638" # TCP address of Thread radio
       BACKBONE_IF: eth0
       OTBR_REST_PORT: 8081
       OTBR_WEB_PORT: 8080
@@ -95,7 +95,7 @@ services:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `NETWORK_DEVICE` | TCP address for network radios (e.g., `192.168.1.10:5000`) | USB serial if unset |
+| `NETWORK_DEVICE` | TCP address for network radios (e.g., `192.168.1.10:6638`) | USB serial if unset |
 | `BAUDRATE` | Serial baudrate | `460800` |
 | `FLOW_CONTROL` | Hardware flow control (1=enabled, 0=disabled) | `1` |
 
@@ -225,3 +225,4 @@ See [LICENSE](LICENSE) file.
 ## Credits
 
 Based on the [Home Assistant OTBR Add-on](https://github.com/home-assistant/addons/tree/master/openthread_border_router), converted to a standalone container.
+
