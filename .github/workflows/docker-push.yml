@@ -168,16 +168,32 @@ jobs:
           echo "MANIFEST_TAG=$MANIFEST_TAG" >> $GITHUB_OUTPUT
           echo "AMD64_TAG=$AMD64_TAG" >> $GITHUB_OUTPUT
           echo "ARM64_TAG=$ARM64_TAG" >> $GITHUB_OUTPUT
-          # Always create :latest as well
+          # Always create :latest
           echo "LATEST_TAG=latest" >> $GITHUB_OUTPUT
+          # Set IS_RELEASE flag for stable tag
+          echo "IS_RELEASE=${{ github.ref_type == 'tag' }}" >> $GITHUB_OUTPUT
 
       - name: Create and push manifest
         run: |
+          # Push version-specific tag
           docker manifest create ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.MANIFEST_TAG }} \
             ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.AMD64_TAG }} \
             ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.ARM64_TAG }}
           docker manifest push ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.MANIFEST_TAG }}
+          
+          # Always push :latest
           docker manifest create ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.LATEST_TAG }} \
             ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.AMD64_TAG }} \
             ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.ARM64_TAG }}
           docker manifest push ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.LATEST_TAG }}
+          
+          # Only push :stable on release tags
+          if [ "${{ steps.manifest_vars.outputs.IS_RELEASE }}" = "true" ]; then
+            echo "Release detected, creating :stable tag..."
+            docker manifest create ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:stable \
+              ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.AMD64_TAG }} \
+              ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:${{ steps.manifest_vars.outputs.ARM64_TAG }}
+            docker manifest push ${{ steps.manifest_vars.outputs.FULL_IMAGE_NAME }}:stable
+          else
+            echo "Not a release, skipping :stable tag"
+          fi
