@@ -7,8 +7,8 @@
 . /etc/s6-overlay/scripts/hassio_compat.sh
 
 # Check if the new multi-build structure exists (HA OTBR 2.16.0+)
-# If not, binaries are already in /usr/sbin (older base images)
-if [ -d "/opt/otbr-beta" ] && [ -d "/opt/otbr-stable" ]; then
+# Verify both directories exist AND the binaries are present
+if [ -d "/opt/otbr-beta" ] && [ -d "/opt/otbr-stable" ] && [ -f "/opt/otbr-stable/sbin/otbr-agent" ]; then
     # config_true 'beta' reads the BETA environment variable (converted from lowercase)
     # Set BETA=1 or BETA=true to enable beta mode
     if config_true 'beta'; then
@@ -28,16 +28,28 @@ if [ -d "/opt/otbr-beta" ] && [ -d "/opt/otbr-stable" ]; then
         ln -sf "/opt/otbr-stable/sbin/otbr-web" /usr/sbin/otbr-web
         ln -sf "/opt/otbr-stable/sbin/ot-ctl" /usr/sbin/ot-ctl
 
-        # Enable mDNSResponder for stable mode
-        touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
-        touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+        # Enable mDNSResponder for stable mode (if mdnsd exists)
+        if [ -f "/usr/sbin/mdnsd" ]; then
+            touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
+            touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+        else
+            log_warn "mdnsd not found - mDNS service discovery may not work properly."
+            rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
+            rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+        fi
     fi
 else
     log_info "Using legacy base image (pre-2.16.0), binaries already in place."
     
-    # Ensure mDNS is enabled for legacy images (they always use mDNSResponder)
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
-    touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+    # Ensure mDNS is enabled for legacy images if mdnsd exists
+    if [ -f "/usr/sbin/mdnsd" ]; then
+        touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
+        touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+    else
+        log_warn "mdnsd not found - disabling mDNS service (OTBR will still function)."
+        rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
+        rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+    fi
     
     if config_true 'beta'; then
         log_warn "Beta mode requested but base image doesn't support it. Using stable mode."
