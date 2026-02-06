@@ -27,13 +27,14 @@ if [ -d "/opt/otbr-beta" ] && [ -d "/opt/otbr-stable" ] && [ -f "/opt/otbr-stabl
         ln -sf "/opt/otbr-stable/sbin/otbr-agent" /usr/sbin/otbr-agent
         ln -sf "/opt/otbr-stable/sbin/otbr-web" /usr/sbin/otbr-web
         ln -sf "/opt/otbr-stable/sbin/ot-ctl" /usr/sbin/ot-ctl
+        ln -sf "/opt/otbr-stable/sbin/mdnsd" /usr/sbin/mdnsd
 
         # Enable mDNSResponder for stable mode (if mdnsd exists)
-        if [ -f "/usr/sbin/mdnsd" ]; then
+        if [ -f "/opt/otbr-stable/sbin/mdnsd" ]; then
             touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
             touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
         else
-            log_warn "mdnsd not found - mDNS service discovery may not work properly."
+            log_warn "mdnsd not found - disabling mDNS (service discovery may be limited)."
             rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
             rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
         fi
@@ -46,7 +47,7 @@ else
         touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
         touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
     else
-        log_warn "mdnsd not found - disabling mDNS service (OTBR will still function)."
+        log_warn "mdnsd not found - disabling mDNS (service discovery may be limited)."
         rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
         rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
     fi
@@ -64,7 +65,7 @@ fi
 if var_has_value "$(addon_port 8080)"; then
     log_info "Web UI port is exposed, starting otbr-web."
 else
-    rm /etc/s6-overlay/s6-rc.d/user/contents.d/otbr-web
+    rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/otbr-web
     log_info "The otbr-web is disabled."
 fi
 

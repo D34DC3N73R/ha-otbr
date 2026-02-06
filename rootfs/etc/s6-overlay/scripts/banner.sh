@@ -5,9 +5,6 @@
 # ==============================================================================
 . /etc/s6-overlay/scripts/hassio_compat.sh
 
-# Run enable-check for service configuration BEFORE banner
-/etc/s6-overlay/scripts/enable-check.sh
-
 log_info '-----------------------------------------------------------'
 log_info " OpenThread Border Router (OTBR)"
 log_info " Standalone container - no supervisor required"
