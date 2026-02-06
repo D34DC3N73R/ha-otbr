@@ -61,6 +61,14 @@ services:
       # 1 = enabled, 0 = disabled
       NAT64: 1
       
+      # ===== OPTIONAL: Advanced Features =====
+      
+      # Beta mode: Enable Thread 1.4 with native OpenThread mDNS
+      # 0 = disabled/stable (default) - Thread 1.3 with mDNSResponder
+      # 1 = enabled/beta - Thread 1.4 with OpenThread's built-in mDNS
+      # WARNING: Beta mode is experimental and may have stability issues
+      BETA: 0
+      
       # ===== OPTIONAL: Logging =====
       
       # Log level: debug, info, notice, warning, error, critical, alert, emergency

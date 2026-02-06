@@ -1,10 +1,38 @@
 #!/usr/bin/with-contenv bash
 # shellcheck shell=bash
 # ==============================================================================
-# Disable OTBR Web if necessary ports are not exposed
+# Select OTBR version and enable mDNSResponder for stable mode
 # ==============================================================================
 
 . /etc/s6-overlay/scripts/hassio_compat.sh
+
+# config_true 'beta' reads the BETA environment variable (converted from lowercase)
+# Set BETA=1 or BETA=true to enable beta mode
+if config_true 'beta'; then
+    log_info "Beta mode enabled, using OpenThread built-in mDNS."
+
+    ln -sf "/opt/otbr-beta/sbin/otbr-agent" /usr/sbin/otbr-agent
+    ln -sf "/opt/otbr-beta/sbin/otbr-web" /usr/sbin/otbr-web
+    ln -sf "/opt/otbr-beta/sbin/ot-ctl" /usr/sbin/ot-ctl
+
+    # Disable mDNSResponder as beta uses OpenThread's built-in mDNS
+    rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
+    rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+else
+    log_info "Stable mode (default), using stable binaries with mDNSResponder."
+
+    ln -sf "/opt/otbr-stable/sbin/otbr-agent" /usr/sbin/otbr-agent
+    ln -sf "/opt/otbr-stable/sbin/otbr-web" /usr/sbin/otbr-web
+    ln -sf "/opt/otbr-stable/sbin/ot-ctl" /usr/sbin/ot-ctl
+
+    # Enable mDNSResponder for stable mode
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
+    touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
+fi
+
+# ==============================================================================
+# Disable OTBR Web if necessary ports are not exposed
+# ==============================================================================
 
 # Web UI requires port 8080 to be set
 if var_has_value "$(addon_port 8080)"; then
