@@ -66,7 +66,8 @@ services:
       # Beta mode: Enable Thread 1.4 with native OpenThread mDNS
       # 0 = disabled/stable (default) - Thread 1.3 with mDNSResponder
       # 1 = enabled/beta - Thread 1.4 with OpenThread's built-in mDNS
-      # WARNING: Beta mode is experimental and may have stability issues
+      # WARNING: Beta mode is experimental and requires Thread 1.4 firmware
+      # See README.md "Firmware Flashing" section for upgrade instructions
       BETA: 0
       
       # ===== OPTIONAL: Logging =====

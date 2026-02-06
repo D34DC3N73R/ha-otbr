@@ -37,7 +37,7 @@ services:
       BAUDRATE: 460800                    # Serial baudrate
       FIREWALL: 1                         # Enable Thread firewall
       NAT64: 1                            # Enable NAT64 for Thread devices
-      BETA: 0                             # Beta mode: 0=stable, 1=experimental Thread 1.4
+      BETA: 0                             # Beta mode: 0=stable, 1=Thread 1.4 (requires firmware upgrade)
       OTBR_LOG_LEVEL: info                # Log level: debug|info|warning|error
     devices:
       - /dev/ttyUSB0                      # Expose your Thread radio
@@ -69,7 +69,7 @@ services:
       BAUDRATE: 460800
       FIREWALL: 1
       NAT64: 1
-      BETA: 0
+      BETA: 0                             # Beta: requires Thread 1.4 firmware
     devices:
       - /dev/net/tun
     volumes:
@@ -113,11 +113,13 @@ services:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `BETA` | Enable beta mode with Thread 1.4 and native OpenThread mDNS (instead of Thread 1.3 with mDNSResponder). Set to `1` or `true` to enable. | `0` (disabled) |
+| `BETA` | Enable beta mode with Thread 1.4 and native OpenThread mDNS (instead of Thread 1.3 with mDNSResponder). Set to `1` or `true` to enable. **Requires Thread 1.4 firmware on your radio.** | `0` (disabled) |
 
 > **⚠️ Beta Mode Warning**
 > 
 > Beta mode enables Thread 1.4 features and uses OpenThread's built-in mDNS instead of mDNSResponder. This is experimental and may have stability or compatibility issues. Use stable mode (default) for production systems.
+>
+> **Thread 1.4 Firmware Required:** Beta mode requires Thread 1.4 firmware flashed on your radio hardware. You must flash the appropriate firmware for your device before enabling beta mode.
 
 ## Port Configuration
 
