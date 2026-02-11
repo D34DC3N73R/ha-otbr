@@ -1,7 +1,7 @@
 services:
   otbr:
     container_name: otbr
-    image: ghcr.io/d34dc3n73r/ha-otbr:latest
+    image: ghcr.io/d34dc3n73r/ha-otbr:stable
     restart: unless-stopped
     
     # Host networking is REQUIRED for proper IPv6 multicast, mDNS, and Thread TREL

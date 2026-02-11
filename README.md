@@ -21,7 +21,7 @@ A standalone Docker container for running an OpenThread Border Router without Ho
 services:
   otbr:
     container_name: otbr
-    image: ghcr.io/d34dc3n73r/ha-otbr:latest
+    image: ghcr.io/d34dc3n73r/ha-otbr:stable
     restart: unless-stopped
     network_mode: host
     cap_add:
@@ -53,7 +53,7 @@ services:
 services:
   otbr:
     container_name: otbr
-    image: ghcr.io/d34dc3n73r/ha-otbr:latest
+    image: ghcr.io/d34dc3n73r/ha-otbr:stable
     restart: unless-stopped
     network_mode: host
     cap_add:
