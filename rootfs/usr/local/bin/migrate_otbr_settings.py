@@ -1,6 +1,7 @@
 import asyncio
 import argparse
 import datetime
+import re
 import zigpy.serial
 from pathlib import Path
 from serialx import PinState
@@ -156,7 +157,14 @@ async def main() -> None:
     # Then, look at existing settings
     all_settings = []
 
+    # Only consider files matching the hwaddr filename pattern (e.g. 0_e0798dfffe1a343a.data).
+    # Excludes temp files like 0_0-tmp.data that otbr-agent may leave behind.
+    hwaddr_filename_re = re.compile(r"^\d+_[0-9a-f]+\.data$")
+
     for settings_path in args.data_dir.glob("*.data"):
+        if not hwaddr_filename_re.match(settings_path.name):
+            print(f"Skipping non-hwaddr file {settings_path.name}")
+            continue
         mod_time = settings_path.stat().st_mtime
         otbr_settings = parse_otbr_settings(settings_path.read_bytes())
 
