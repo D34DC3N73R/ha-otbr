@@ -220,6 +220,9 @@ async def main() -> None:
 
 if __name__ == "__main__":
     import coloredlogs
+    import os
 
-    coloredlogs.install(level="DEBUG")
+    otbr_log_level = os.environ.get("OTBR_LOG_LEVEL", "info").lower()
+    log_level = "DEBUG" if otbr_log_level == "debug" else "WARNING"
+    coloredlogs.install(level=log_level)
     asyncio.run(main())
