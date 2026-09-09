@@ -1,61 +1,30 @@
 #!/usr/bin/with-contenv bash
 # shellcheck shell=bash
 # ==============================================================================
-# Select OTBR version and enable mDNSResponder for stable mode
+# Select the OTBR build to run
 # ==============================================================================
 
 . /etc/s6-overlay/scripts/hassio_compat.sh
 
-# Check if the new multi-build structure exists (HA OTBR 2.16.0+)
-# Verify both directories exist AND the binaries are present
-if [ -d "/opt/otbr-beta" ] && [ -d "/opt/otbr-stable" ] && [ -f "/opt/otbr-stable/sbin/otbr-agent" ]; then
-    # config_true 'beta' reads the BETA environment variable (converted from lowercase)
-    # Set BETA=1 or BETA=true to enable beta mode
-    if config_true 'beta'; then
-        log_info "Beta mode enabled, using OpenThread built-in mDNS."
+declare otbr_prefix
 
-        ln -sf "/opt/otbr-beta/sbin/otbr-agent" /usr/sbin/otbr-agent
-        ln -sf "/opt/otbr-beta/sbin/otbr-web" /usr/sbin/otbr-web
-        ln -sf "/opt/otbr-beta/sbin/ot-ctl" /usr/sbin/ot-ctl
-
-        # Disable mDNSResponder as beta uses OpenThread's built-in mDNS
-        rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
-        rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
-    else
-        log_info "Stable mode (default), using stable binaries with mDNSResponder."
-
-        ln -sf "/opt/otbr-stable/sbin/otbr-agent" /usr/sbin/otbr-agent
-        ln -sf "/opt/otbr-stable/sbin/otbr-web" /usr/sbin/otbr-web
-        ln -sf "/opt/otbr-stable/sbin/ot-ctl" /usr/sbin/ot-ctl
-        ln -sf "/opt/otbr-stable/sbin/mdnsd" /usr/sbin/mdnsd
-
-        # Enable mDNSResponder for stable mode (if mdnsd exists)
-        if [ -f "/opt/otbr-stable/sbin/mdnsd" ]; then
-            touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
-            touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
-        else
-            log_warn "mdnsd not found - disabling mDNS (service discovery may be limited)."
-            rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
-            rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
-        fi
-    fi
+# config_true 'beta' reads the BETA environment variable.
+# Set BETA=1 or BETA=true to run the pre-release build instead of the stable one.
+if config_true 'beta'; then
+    log_info "Beta mode enabled."
+    otbr_prefix="/opt/otbr-beta"
 else
-    log_info "Using legacy base image (pre-2.16.0), binaries already in place."
-    
-    # Ensure mDNS is enabled for legacy images if mdnsd exists
-    if [ -f "/usr/sbin/mdnsd" ]; then
-        touch /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
-        touch /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
-    else
-        log_warn "mdnsd not found - disabling mDNS (service discovery may be limited)."
-        rm -f /etc/s6-overlay/s6-rc.d/user/contents.d/mdns
-        rm -f /etc/s6-overlay/s6-rc.d/otbr-agent/dependencies.d/mdns
-    fi
-    
-    if config_true 'beta'; then
-        log_warn "Beta mode requested but base image doesn't support it. Using stable mode."
-    fi
+    log_info "Stable mode enabled."
+    otbr_prefix="/opt/otbr-stable"
 fi
+
+if [ ! -f "${otbr_prefix}/sbin/otbr-agent" ]; then
+    exit_nok "No otbr-agent in ${otbr_prefix}. The base image layout changed; this image needs updating."
+fi
+
+ln -sf "${otbr_prefix}/sbin/otbr-agent" /usr/sbin/otbr-agent
+ln -sf "${otbr_prefix}/sbin/otbr-web" /usr/sbin/otbr-web
+ln -sf "${otbr_prefix}/sbin/ot-ctl" /usr/sbin/ot-ctl
 
 # ==============================================================================
 # Disable OTBR Web if necessary ports are not exposed

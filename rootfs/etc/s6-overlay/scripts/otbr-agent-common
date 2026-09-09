@@ -1,6 +1,8 @@
 # shellcheck shell=bash
 # shellcheck disable=SC2034
 
+. /etc/s6-overlay/scripts/hassio_compat.sh
+
 declare thread_if
 declare otbr_forward_ingress_chain
 declare otbr_forward_egress_chain
@@ -11,4 +13,40 @@ otbr_forward_ingress_chain="OTBR_FORWARD_INGRESS"
 otbr_forward_egress_chain="OTBR_FORWARD_EGRESS"
 otbr_forward_nat64_chain="OTBR_FORWARD_NAT64"
 otbr_fw_mark="0x1001"
+
+# Map the configured otbr_log_level to the numeric level expected by the
+# otbr-agent/otbr-web -d flag. Echoes the numeric level on success, returns
+# non-zero on an unknown level (callers own the user-facing error message).
+otbr_log_level_to_int() {
+    local level
+    level=$(string_lower "$(config_get otbr_log_level)")
+    case "${level}" in
+        debug)     echo "7" ;;
+        info)      echo "6" ;;
+        notice)    echo "5" ;;
+        warning)   echo "4" ;;
+        error)     echo "3" ;;
+        critical)  echo "2" ;;
+        alert)     echo "1" ;;
+        emergency) echo "0" ;;
+        *)         return 1 ;;
+    esac
+}
+
+# Drop any existing FORWARD jump to <chain>, then (re)create it empty.
+# Usage: reset_forward_chain <iptables|ip6tables> <chain> [match args...]
+#
+# A container that was killed rather than stopped never runs the finish script,
+# so its chains and jumps survive in the host's tables. Without this, every
+# restart appends a second copy of the whole rule set.
+reset_forward_chain() {
+    local ipt="$1" chain="$2"
+    shift 2
+
+    while "${ipt}" -C FORWARD "$@" -j "${chain}" 2> /dev/null; do
+        "${ipt}" -D FORWARD "$@" -j "${chain}"
+    done
+
+    "${ipt}" -N "${chain}" 2> /dev/null || "${ipt}" -w -F "${chain}"
+}
 

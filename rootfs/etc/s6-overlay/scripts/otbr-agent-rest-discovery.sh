@@ -1,21 +1,19 @@
 #!/usr/bin/with-contenv bash
 # shellcheck shell=bash
 # ==============================================================================
-# Send OTBR discovery information to Home Assistant
+# Log how to reach this border router from Home Assistant
 # ==============================================================================
+# There is no Supervisor to push discovery to, so rather than claiming a
+# discovery message was sent, print what the user has to enter by hand under
+# Settings -> Devices & Services -> Add Integration -> OpenThread Border Router.
 . /etc/s6-overlay/scripts/hassio_compat.sh
-declare config
 
-config=$(var_json \
-    host "$(addon_hostname)" \
-    port "$(addon_port 8081)" \
-    device "$(config_get 'device')" \
-    firmware "$(ot-ctl rcp version | head -n 1)" \
-)
+# `sed -n 1p` rather than `head -n 1`: head closes the pipe after one line, which
+# makes otbr-agent's CLI daemon log "Failed to write CLI output: Broken pipe".
+log_info "RCP firmware: $(ot-ctl rcp version | sed -n 1p)"
 
-# Send discovery info
-if discovery_send "otbr" "${config}" > /dev/null; then
-    log_info "Successfully sent discovery information to Home Assistant."
+if var_has_value "$(addon_port 8081)"; then
+    log_info "Add to Home Assistant with URL: http://$(addon_hostname):8081 (or the host's IP)"
 else
-    log_error "Discovery message to Home Assistant failed!"
+    log_info "REST API is bound to $(addon_ip_address) only. Set OTBR_REST_PORT=8081 to reach it from Home Assistant."
 fi

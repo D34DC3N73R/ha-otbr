@@ -7,29 +7,28 @@
 
 # shellcheck source=./rootfs/etc/s6-overlay/scripts/otbr-agent-common
 . /etc/s6-overlay/scripts/otbr-agent-common
-. /etc/s6-overlay/scripts/hassio_compat.sh
 
 declare backbone_if
 declare device
 declare baudrate
 declare flow_control
 declare migrate_flow_control
-declare otbr_log_level
 declare otbr_log_level_int
 declare otbr_rest_listen
 declare otbr_rest_listen_port
 
-# Cleanup unused configs
-if config_exists 'autoflash_firmware'; then
-    addon_option 'autoflash_firmware'
-fi
-
-# Prefer explicit BACKBONE_IF config (env BACKBONE_IF) when provided
+# Prefer explicit BACKBONE_IF config (env BACKBONE_IF) when provided,
+# otherwise fall back to whichever interface holds the default route.
 if config_has_value 'backbone_if'; then
     backbone_if="$(config_get 'backbone_if')"
 else
-    backbone_if="$(api_supervisor 'GET' '/network/info')"
+    backbone_if="$(primary_interface)"
 fi
+
+if [ -z "${backbone_if}" ]; then
+    exit_nok "No primary network interface found. Set BACKBONE_IF to the interface facing your LAN."
+fi
+log_info "Using backbone interface: ${backbone_if}"
 
 # Check if IPv6 forwarding is enabled
 if [ "$(cat /proc/sys/net/ipv6/conf/all/forwarding)" != "1" ]; then
@@ -40,6 +39,8 @@ device=$(config_get 'device')
 
 if config_has_value 'network_device'; then
     device="/tmp/ttyOTBR"
+elif ! var_has_value "${device}"; then
+    exit_nok "No radio configured. Set DEVICE to your serial adapter, or NETWORK_DEVICE to a TCP address."
 fi
 
 baudrate=$(config_get 'baudrate')
@@ -53,46 +54,9 @@ else
     migrate_flow_control="none"
 fi
 
-otbr_log_level=$(string_lower "$(config_get otbr_log_level)")
-case "${otbr_log_level}" in
-    debug)
-        otbr_log_level_int="7"
-        ;;
-    info)
-        otbr_log_level_int="6"
-        ;;
-    notice)
-        otbr_log_level_int="5"
-        ;;
-    warning)
-        otbr_log_level_int="4"
-        ;;
-    error)
-        otbr_log_level_int="3"
-        ;;
-    critical)
-        otbr_log_level_int="2"
-        ;;
-    alert)
-        otbr_log_level_int="1"
-        ;;
-    emergency)
-        otbr_log_level_int="0"
-        ;;
-    *)
-        exit_nok "Unknown otbr_log_level: ${otbr_log_level}"
-        ;;
-esac
+otbr_log_level_int="$(otbr_log_level_to_int)" \
+    || exit_nok "Unknown otbr_log_level: $(config_get otbr_log_level)"
 
-# shellcheck disable=SC2086
-if [ -z "${backbone_if}" ]; then
-    log_warn "No primary network interface found! Using static eth0."
-    backbone_if="eth0"
-else
-    log_info "Using backbone interface: ${backbone_if}"
-fi
-
-# shellcheck disable=SC2015
 # shellcheck disable=SC2015
 mkdir -p /data/thread && ln -sft /var/lib /data/thread || exit_nok "Could not create directory /var/lib/thread to store Thread data."
 
@@ -104,10 +68,10 @@ ipset create -exist otbr-ingress-deny-src-swap hash:net family inet6
 ipset create -exist otbr-ingress-allow-dst hash:net family inet6
 ipset create -exist otbr-ingress-allow-dst-swap hash:net family inet6
 
-ip6tables -N "${otbr_forward_ingress_chain}"
+reset_forward_chain ip6tables "${otbr_forward_ingress_chain}" -o "${thread_if}"
 ip6tables -I FORWARD 1 -o "${thread_if}" -j "${otbr_forward_ingress_chain}"
 
-ip6tables -N "${otbr_forward_egress_chain}"
+reset_forward_chain ip6tables "${otbr_forward_egress_chain}" -i "${thread_if}"
 ip6tables -I FORWARD 2 -i "${thread_if}" -j "${otbr_forward_egress_chain}"
 
 if config_true 'firewall'; then
@@ -128,13 +92,15 @@ fi
 
 if config_true 'nat64'; then
     # Mark Thread traffic in mangle
-    iptables -t mangle -A PREROUTING -i "${thread_if}" -j MARK --set-mark "${otbr_fw_mark}"
+    iptables -t mangle -C PREROUTING -i "${thread_if}" -j MARK --set-mark "${otbr_fw_mark}" 2> /dev/null \
+        || iptables -t mangle -A PREROUTING -i "${thread_if}" -j MARK --set-mark "${otbr_fw_mark}"
 
     # MASQUERADE marked traffic
-    iptables -t nat -A POSTROUTING -m mark --mark "${otbr_fw_mark}" -j MASQUERADE
+    iptables -t nat -C POSTROUTING -m mark --mark "${otbr_fw_mark}" -j MASQUERADE 2> /dev/null \
+        || iptables -t nat -A POSTROUTING -m mark --mark "${otbr_fw_mark}" -j MASQUERADE
 
     # NAT64 forward chain — jump unconditionally, filter inside
-    iptables -N "${otbr_forward_nat64_chain}"
+    reset_forward_chain iptables "${otbr_forward_nat64_chain}"
     iptables -I FORWARD 1 -j "${otbr_forward_nat64_chain}"
 
     # Forward marked traffic
@@ -143,7 +109,6 @@ if config_true 'nat64'; then
     iptables -A "${otbr_forward_nat64_chain}" -m conntrack --ctstate ESTABLISHED,RELATED -i "${backbone_if}" -o "${thread_if}" -j ACCEPT
 fi
 
-otbr_rest_listen="::"
 otbr_rest_listen_port="8081"
 
 # REST API port is hardcoded to 8081 as otbr-web and other components expect this
@@ -167,14 +132,15 @@ python3 /usr/local/bin/migrate_otbr_settings.py \
     --flow-control "${migrate_flow_control}" \
     --data-dir /data/thread/ || log_warn "Settings migration failed"
 
-# shellcheck disable=SC2086
 log_info "Starting otbr-agent..."
+# Do not pipe this into a log filter: `exec cmd | filter` leaves the shell as
+# the supervised process, so s6 signals never reach otbr-agent and the exit
+# code the finish script sees belongs to the filter. Noisy P-Netif/DuaManager
+# warnings on startup are expected and harmless (the add-on logs them too).
 # shellcheck disable=SC2086
-# Filter out harmless/expected warnings from otbr-agent startup
 exec s6-notifyoncheck -d -s 300 -w 300 -n 0 stdbuf -oL \
     "/usr/sbin/otbr-agent" -I ${thread_if} -B "${backbone_if}" \
         --rest-listen-address "${otbr_rest_listen}" \
         -d${otbr_log_level_int} -v -s \
         "spinel+hdlc+uart://${device}?uart-baudrate=${baudrate}${flow_control}" \
-        "trel://${backbone_if}" 2>&1 | \
-    grep -vE '(P-Netif.*Failed to process request.*(No such process|Invalid argument)|DuaManager.*Failed to perform.*registration: NotFound)'
+        "trel://${backbone_if}"

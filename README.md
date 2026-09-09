@@ -11,7 +11,7 @@ A standalone Docker container for running an OpenThread Border Router without Ho
 - ✅ Support for network-connected Thread radios (via TCP)
 - ✅ Automatic Thread settings migration across hardware changes
 - ✅ Host networking mode for proper IPv6 multicast and mDNS
-- ✅ Clean, minimal logs with filtered noise
+- ✅ Add-on defaults preserved, so omitting a variable behaves like the add-on
 
 ## Quick Start
 
@@ -25,9 +25,8 @@ services:
     restart: unless-stopped
     network_mode: host
     cap_add:
-      - SYS_ADMIN
       - NET_ADMIN
-      - NET_RAW
+      - IPC_LOCK
     environment:
       DEVICE: "/dev/ttyUSB0"              # Your Thread radio device
       BACKBONE_IF: eth0                   # Your primary network interface
@@ -37,8 +36,8 @@ services:
       BAUDRATE: 460800                    # Serial baudrate
       FIREWALL: 1                         # Enable Thread firewall
       NAT64: 1                            # Enable NAT64 for Thread devices
-      BETA: 0                             # Beta mode: 0=stable, 1=Thread 1.4 (requires firmware upgrade)
-      OTBR_LOG_LEVEL: info                # Log level: debug|info|warning|error
+      BETA: 0                             # Beta mode: 0=stable OTBR build, 1=pre-release OTBR build
+      OTBR_LOG_LEVEL: info                # Log level: debug|info|notice|warning|error
     devices:
       - /dev/ttyUSB0                      # Expose your Thread radio
       - /dev/net/tun                      # Required for Thread networking
@@ -57,9 +56,8 @@ services:
     restart: unless-stopped
     network_mode: host
     cap_add:
-      - SYS_ADMIN
       - NET_ADMIN
-      - NET_RAW
+      - IPC_LOCK
     environment:
       NETWORK_DEVICE: "192.168.1.100:6638" # TCP address of Thread radio
       BACKBONE_IF: eth0
@@ -69,7 +67,7 @@ services:
       BAUDRATE: 460800
       FIREWALL: 1
       NAT64: 1
-      BETA: 0                             # Beta: requires Thread 1.4 firmware
+      BETA: 0                             # Beta: pre-release OTBR build
     devices:
       - /dev/net/tun
     volumes:
@@ -79,12 +77,30 @@ services:
 
 ## Environment Variables
 
+Every variable below falls back to the same default the Home Assistant add-on
+uses, so omitting one behaves like the add-on rather than silently disabling
+the feature.
+
+> **⚠️ Upgrade note:** earlier images treated an unset variable as "off".
+> `FLOW_CONTROL` and `FIREWALL` now default to **enabled**, matching the add-on.
+> If you were relying on the old behaviour — most notably a radio wired without
+> hardware flow control — set `FLOW_CONTROL: 0` explicitly.
+
 ### Required
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `DEVICE` | Serial device path for Thread radio | `/dev/ttyUSB0` |
-| `BACKBONE_IF` | Primary network interface name | `eth0` |
+| `DEVICE` | Serial device path for Thread radio (or set `NETWORK_DEVICE`) | `/dev/ttyUSB0` |
+
+The container exits at startup if neither `DEVICE` nor `NETWORK_DEVICE` is set.
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `BACKBONE_IF` | Primary network interface name | Interface holding the default route |
+
+If `BACKBONE_IF` is unset and no default route can be found, the container exits
+rather than guessing — a wrong backbone interface produces a border router that
+starts cleanly and routes nothing.
 
 ### Optional Services
 
@@ -99,27 +115,29 @@ services:
 |----------|-------------|---------|
 | `NETWORK_DEVICE` | TCP address for network radios (e.g., `192.168.1.10:6638`) | USB serial if unset |
 | `BAUDRATE` | Serial baudrate | `460800` |
-| `FLOW_CONTROL` | Hardware flow control (1=enabled, 0=disabled) | `1` |
+| `FLOW_CONTROL` | Hardware flow control | `1` (enabled) |
 
 ### Network & Security
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `FIREWALL` | Enable Thread ingress firewall | `1` |
-| `NAT64` | Enable NAT64 for Thread IPv6→IPv4 | `1` |
-| `OTBR_LOG_LEVEL` | Log verbosity: `debug`, `info`, `warning`, `error` | `info` |
+| `FIREWALL` | Enable Thread ingress firewall | `1` (enabled) |
+| `NAT64` | Enable NAT64 for Thread IPv6→IPv4 | `0` (disabled) |
+| `OTBR_LOG_LEVEL` | Log verbosity: `debug`, `info`, `notice`, `warning`, `error`, `critical`, `alert`, `emergency`. Applies to both `otbr-agent` and the Web UI. | `notice` |
+
+Booleans accept `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`, case-insensitively.
 
 ### Advanced Features
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `BETA` | Enable beta mode with Thread 1.4 and native OpenThread mDNS (instead of Thread 1.3 with mDNSResponder). Set to `1` or `true` to enable. **Requires Thread 1.4 firmware on your radio.** | `0` (disabled) |
+| `BETA` | Run the pre-release OTBR build instead of the stable one. Set to `1` or `true` to enable. | `0` (disabled) |
 
 > **⚠️ Beta Mode Warning**
-> 
-> Beta mode enables Thread 1.4 features and uses OpenThread's built-in mDNS instead of mDNSResponder. This is experimental and may have stability or compatibility issues. Use stable mode (default) for production systems.
 >
-> **Thread 1.4 Firmware Required:** Beta mode requires Thread 1.4 firmware flashed on your radio hardware. You must flash the appropriate firmware for your device before enabling beta mode.
+> Beta mode runs a newer, unreleased OpenThread Border Router build (currently `v2026.08.0` plus ePSKc / Thread 1.4 Credentials Sharing). It may have stability or compatibility issues — use stable mode (default) for production systems.
+>
+> **Changed in HA OTBR 3.0.0:** Thread 1.4 and OpenThread's built-in mDNS are now used in **both** stable and beta mode, and `mDNSResponder` is gone. `BETA` no longer selects the Thread version — it only selects a newer OTBR build. Thread 1.4 firmware is required on your radio either way.
 
 ## Port Configuration
 
@@ -147,6 +165,15 @@ The Web UI can run on any port and is completely optional.
   - Proper IPv6 multicast routing
   - mDNS service discovery
   - Thread TREL (Thread Radio Encapsulation Link)
+
+- **Do not set a custom `hostname:`.** OTBR publishes itself over mDNS as
+  `<hostname>-otbr`. With `network_mode: host` Docker gives the container the
+  host's hostname, so that name is already stable across recreates — overriding
+  it, or dropping host networking, makes the published name drift.
+
+- **Capabilities.** The add-on grants only `NET_ADMIN` and `IPC_LOCK`. `NET_RAW`
+  is already in Docker's default capability set, and `SYS_ADMIN` should not be
+  needed — if s6 fails to start on your host, add it back and please open an issue.
 
 ### Host System Configuration
 
@@ -196,10 +223,16 @@ Thread network settings are stored in `/data/thread/`:
 
 ## Home Assistant Integration
 
+There is no Supervisor to push discovery, so add the border router by URL:
+
 1. In Home Assistant, go to **Settings → Devices & Services → Add Integration**
 2. Search for **"OpenThread Border Router"**
-3. Enter the container's IP address and port `8081`
-4. The Thread network will be discovered automatically
+3. Enter `http://<host-ip>:8081`
+4. The Thread network will be set up automatically
+
+This requires `OTBR_REST_PORT: 8081`; without it the REST API only listens on
+localhost and Home Assistant cannot reach it. The container logs the exact URL
+to use on startup.
 
 ## Troubleshooting
 
