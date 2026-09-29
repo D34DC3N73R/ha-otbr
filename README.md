@@ -135,7 +135,7 @@ Booleans accept `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`, case-insensiti
 
 > **⚠️ Beta Mode Warning**
 >
-> Beta mode runs a newer, unreleased OpenThread Border Router build (currently `v2026.08.0` plus ePSKc / Thread 1.4 Credentials Sharing). It may have stability or compatibility issues — use stable mode (default) for production systems.
+> Beta mode runs a newer, unreleased OpenThread Border Router build (currently `v2026.09.0`, with ePSKc / Thread 1.4 Credentials Sharing in the Web UI). It may have stability or compatibility issues — use stable mode (default) for production systems.
 >
 > **Changed in HA OTBR 3.0.0:** Thread 1.4 and OpenThread's built-in mDNS are now used in **both** stable and beta mode, and `mDNSResponder` is gone. `BETA` no longer selects the Thread version — it only selects a newer OTBR build. Thread 1.4 firmware is required on your radio either way.
 
